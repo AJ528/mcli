@@ -1,0 +1,40 @@
+{
+    // See https://go.microsoft.com/fwlink/?LinkId=733558
+    // for the documentation about the tasks.json format
+    "version": "2.0.0",
+    "tasks": [
+      // this task rebuilds the project
+      {
+        // name of the task, this is how tasks are identified
+        "label": "build",
+        // "type" can be "process" or "shell". "shell" will run the command
+        // inside a shell (like bash) and can evaluate shell commands like "if"
+        "type": "shell",
+        // the command to be executed. In this case calling make without any 
+        // arguments will automatically rebuild the executable
+        "command": "make",
+        // "group" allows you to specify if the task belongs to the "build"
+        // group or "test" group
+        "group": {
+          "kind": "build",
+          // by specifying this task is a "build" task and it is the default,
+          // vscodium will automatically run this task to rebuild the program
+          // using the CTRL+SHIFT+B shortcut
+          "isDefault": true
+        },
+        // presentation configures a panel that may appear to give information
+        // about the status of the task
+        "presentation": {
+          // "reveal" controls when the terminal running the task is shown
+          // "silent" means the terminal is only shown if there is a problem
+          "reveal": "silent",
+          // "panel" controls if the panel being shown is shared with other
+          // tasks, dedicated to this task, or a new one is opened every time
+          "panel": "dedicated",
+          // "showReuseMessage" controls if the "Terminal will be reused..." 
+          // message is shown
+          "showReuseMessage": false,
+        }
+      }
+    ]
+}
