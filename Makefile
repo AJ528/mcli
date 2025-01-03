@@ -5,6 +5,15 @@
 # adjust optimization flag accordingly below
 debug = 1
 
+# set fpu to soft, softfp or hard
+# soft is also for when you aren't using the FPU
+# soft:   software fpu, soft abi
+# softfp: hardware fpu, soft abi
+# hard:   harwdare fpu, hard abi
+fpu = soft
+# IMPORTANT: none of the STM32WL microcontrollers have a hardware FPU,
+# so this setting should always be set to "soft".
+
 # names of directories for compiled objects
 BIN_DIR = bin
 OBJ_DIR = obj
@@ -13,29 +22,53 @@ DEP_DIR = dep
 # name of the output image
 TARGET_NAME := mcli
 TARGET_ELF := $(BIN_DIR)/$(TARGET_NAME).elf
+TARGET_BIN := $(BIN_DIR)/$(TARGET_NAME).bin
 
 # locations of directories containing source files.
 # these locations should be specified relative to the makefile location.
 SRC_DIRS = \
-	src
+	src \
+	drivers \
+	drivers/utilities \
+	drivers/stm32wlxx_low_level
 
 # locations of directories containing header files.
 # these locations should be specified relative to the makefile location.
 INC_DIRS = \
-	inc
+	inc \
+	drivers/inc \
+	drivers/CMSIS_inc \
+	drivers/device_inc \
+	drivers/stm32wlxx_ll_inc
 
 # predefined macros
-DEFINES = 
+DEFINES = 		\
+	STM32WL 	\
+	STM32WL55xx	\
+	CORE_CM4
 
+# if you are going to use the low level drivers, define this value to expose init structures
+DEFINES += USE_FULL_LL_DRIVER
 
 # sets OPTIMIZE_FLAGS based on debug above
 ifeq ($(debug), 1)
 	DEFINES += DEBUG
-	OPTIMIZE_FLAGS = -ggdb3 -Og
+#	OPTIMIZE_FLAGS = -ggdb3 -Og
+	OPTIMIZE_FLAGS = -ggdb3 -O0
 else
 # change optimization options to whatever suits you
 	DEFINES += RELEASE
 	OPTIMIZE_FLAGS = -O2
+endif
+
+
+# sets FLOAT_FLAGS based on fpu above
+ifeq ($(fpu), softfp)
+	FLOAT_FLAGS = -mfloat-abi=softfp -mfpu=fpv5-sp-d16
+else ifeq ($(fpu), hard)
+	FLOAT_FLAGS = -mfloat-abi=hard -mfpu=fpv5-sp-d16
+else
+	FLOAT_FLAGS = -mfloat-abi=soft
 endif
 
 # creates the list of define flags to pass to the compiler
@@ -46,12 +79,26 @@ INC_FLAGS := $(addprefix -I,$(INC_DIRS))
 VPATH = $(SRC_DIRS)
 
 # compiler you want to use
-CC = gcc
+CC = arm-none-eabi-gcc
+# objcopy you want to use
+OBJCOPY =  arm-none-eabi-objcopy
 # size you want to use
-SIZE = size
+SIZE = arm-none-eabi-size
 
+# cpu target and instruction set
+COMMON_FLAGS = -mcpu=cortex-m4
+# instruction set (all ARM Cortex-M only support thumb instruction sets)
+COMMON_FLAGS += -mthumb
+# floating point flags
+COMMON_FLAGS += $(FLOAT_FLAGS)
 # define flags
 COMMON_FLAGS += $(DEFINE_FLAGS)
+# use no system libraries
+COMMON_FLAGS += --specs=nosys.specs
+COMMON_FLAGS += -nostdlib
+# use no builtin functions 
+# this prevent gcc from optimizing printf() if you decide to roll your own
+COMMON_FLAGS += -fno-builtin
 
 # compiler, assembler, and linker flags all start with the same flags
 CFLAGS = $(COMMON_FLAGS)
@@ -75,9 +122,15 @@ CFLAGS += -Wextra
 ASFLAGS += $(OPTIMIZE_FLAGS)
 
 # add on linker-specific flags
+# specify the linker script to use
+LDFLAGS += -T"STM32WL_FLASH.ld"
+# if any system libraries are used, include their code with the executable by statically linking it
+LDFLAGS += -static
 # note: if you want to use the "-Wl" to pass options to the linker, there must be NO SPACES
 # remove empty sections only if not for debug
 LDFLAGS += -Wl,--gc-sections
+# according to the datasheet, the flash page size is 0x800 bytes
+LDFLAGS += -Wl,-z,max-page-size=0x800
 # generate a map file about the output
 LDFLAGS += -Xlinker -Map=$(OBJ_DIR)/$(TARGET_NAME).map
 # link in libgcc to handle some low level arithmetic operations
@@ -111,6 +164,11 @@ DEPS := $(addprefix $(DEP_DIR)/, $(addsuffix .d, $(notdir $(basename $(DEP_SRCS)
 $(TARGET_ELF): $(OBJS) pdebug | $(BIN_DIR)
 	$(CC) -o $@ $(OBJS) $(LDFLAGS)
 	$(SIZE) $(TARGET_ELF)
+
+# rule for turning the .elf program into a binary.The prerequisites are the ELF file
+# and the existence of the binary directory. 
+$(TARGET_BIN): $(TARGET_ELF) | $(BIN_DIR)
+	$(OBJCOPY) -O binary $(TARGET_ELF) $@
 
 # rule to make object files from .c source files. The recipe to build the .o file is specified here. 
 # the prerequisites listed here do not include the header (.h) files needed to compile each object file
@@ -167,7 +225,10 @@ $(BIN_DIR) $(OBJ_DIR) $(DEP_DIR):
 
 # .PHONY targets will be run every time they are called.
 # any special recipes you want to run by name should be a phony target.
-.PHONY: clean pdebug help
+.PHONY: clean pdebug debug help
+
+debug: $(TARGET_ELF)
+	./debug.sh
 
 # recipe to print some debug information
 pdebug:
@@ -181,7 +242,9 @@ clean:
 # recipe to print usage information
 help:
 	@echo "               make: rebuilds source code, which regenerates $(TARGET_ELF)"
+	@echo "make $(TARGET_BIN): rebuilds source code, then uses $(OBJCOPY) to generate $(TARGET_BIN)"
 	@echo "         make clean: cleans the build output by deleting all generated files"
+	@echo "         make debug: rebuilds source code, then calls debug.sh to autostart debugging"
 	@echo "          make help: displays this help message" 
 
 # if we are not cleaning the workspace, include the dependency files.
