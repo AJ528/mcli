@@ -1,4 +1,5 @@
 #include "mprintf.h"
+#include "mcli.h"
 
 #include "stm32wlxx_ll_bus.h"
 #include "stm32wlxx_ll_rcc.h"
@@ -20,11 +21,16 @@ int main(void)
   UART_init();
 
 
-  printf_("hello world!\r\n");
+  println_("hello world!");
 
   while (1)
   {
-  	LL_mDelay(1000);
+    if(LL_LPUART_IsActiveFlag_RXNE_RXFNE(LPUART1)){
+      char c = (char)LL_LPUART_ReceiveData8(LPUART1);
+      cli_input(c);
+    }
+  	// LL_mDelay(1000);
+    cli_process();
 
   }
 }
