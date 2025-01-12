@@ -53,7 +53,6 @@ DEFINES += USE_FULL_LL_DRIVER
 # sets OPTIMIZE_FLAGS based on debug above
 ifeq ($(debug), 1)
 	DEFINES += DEBUG
-#	OPTIMIZE_FLAGS = -ggdb3 -Og
 	OPTIMIZE_FLAGS = -ggdb3 -O0
 else
 # change optimization options to whatever suits you

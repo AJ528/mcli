@@ -25,6 +25,7 @@ int main(void)
 
   while (1)
   {
+    // if UART data is present, receive it
     if(LL_LPUART_IsActiveFlag_RXNE_RXFNE(LPUART1)){
       char c = (char)LL_LPUART_ReceiveData8(LPUART1);
       cli_input(c);
