@@ -11,6 +11,8 @@
 #define RX_BUFFER_SIZE    128
 // CMD_BUFFER_SIZE doesn't need to be a power of 2
 #define CMD_BUFFER_SIZE   128
+// MAX_NUM_ARGS is the maximum number of arguments allowed to be passed to a command
+#define MAX_NUM_ARGS      7
 
 
 typedef struct {
@@ -67,12 +69,14 @@ static int32_t bufPush(ringBuf *buf, uint8_t value);
 static bool bufIsEmpty(ringBuf *buf);
 
 static inline bool isPrintableChar(char c);
+static inline void reset_cmdBuffer(void);
 
 static void handle_escape_char(char c);
 static void handle_printable_char(char c);
 static void handle_control_char(char c);
 
 static void parse_command(void);
+static int32_t tokenize_command(char* cmd_buffer, uint32_t* argc, char* argv[]);
 
 
 
@@ -108,7 +112,9 @@ void cli_process(void)
 
   if(rxBuffer.overflow){
     // handle overflow by erasing the current command
-    // TODO
+    print_newline();
+    println_("ERROR: ring buffer overflowed");
+    reset_cmdBuffer();
     rxBuffer.overflow = false;
   }
 }
@@ -116,8 +122,8 @@ void cli_process(void)
 static void handle_printable_char(char c)
 {
   // cmdBufRWSize is the largest size usable to hold printable characters
-  // 2 bytes at the end are reserved for double '\0'
-  static const uint32_t cmdBufRWSize = CMD_BUFFER_SIZE - 2;
+  // 1 byte at the end is reserved for '\0'
+  static const uint32_t cmdBufRWSize = CMD_BUFFER_SIZE - 1;
   // this escape sequence will shift all chars past the cursor 1 space to the right
   static const char esc_seq_insert_char[] = "\x1B[@";
 
@@ -186,7 +192,10 @@ static void handle_control_char(char c)
     }// else fall through
   case '\r':
     // enter was pressed, handle it here!
-    // TODO
+    print_newline();
+    parse_command();
+    // reset the command buffer
+    reset_cmdBuffer();
     break;
   case 0x7F:
     // DEL case falls through and is treated the same as the BS case
@@ -215,16 +224,53 @@ static inline bool isPrintableChar(char c)
   }
 }
 
+static inline void reset_cmdBuffer(void)
+{
+    cmdBuffer.data[0] = '\0';
+    cmdBuffer.len = 0;
+    cmdBuffer.cursorOffset = 0;
+}
+
 static void parse_command(void)
 {
-  // if command is empty, return
+  uint32_t argc;
+  char* argv[MAX_NUM_ARGS + 1];
 
-  // otherwise, tokenize the command
+  int32_t retval = tokenize_command(cmdBuffer.data, &argc, argv);
+
+  if(retval < 0){
+    return;
+  }
 
   // look for a matching command name
-
   // and call it
+}
 
+static int32_t tokenize_command(char* cmd_buffer, uint32_t* argc, char* argv[])
+{
+  uint32_t i = 0;
+  char previous_c = ' ';
+  char c = cmd_buffer[i];
+
+  *argc = 0;
+
+  while(c != '\0'){
+    if((c != ' ') && (previous_c == ' ')){
+      if((*argc) > MAX_NUM_ARGS){
+        println_("ERROR: too many arguments passed");
+        return (-1);
+      }else{
+        argv[(*argc)] = &(cmd_buffer[i]);
+        (*argc)++;
+      }
+    }else if(c == ' '){
+      cmd_buffer[i] = '\0';
+    }
+    previous_c = c;
+    i++;
+    c = cmd_buffer[i];
+  }
+  return 0;
 }
 
 /***** Buffer Functions *****/
