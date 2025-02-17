@@ -32,6 +32,7 @@ SECTIONS
   .isr_vector :
   {
     . = ALIGN(4);
+    _vector_table_offset = .;   /* define the point where the interrupt vector table is located */
     KEEP(*(.isr_vector)) /* interrupt table */
     . = ALIGN(4);
   } > FLASH

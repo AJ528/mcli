@@ -1,6 +1,8 @@
 #include "mprintf.h"
 #include "mcli.h"
 
+#include "stm32wlxx.h"
+
 #include "stm32wlxx_ll_bus.h"
 #include "stm32wlxx_ll_rcc.h"
 #include "stm32wlxx_ll_gpio.h"
@@ -14,9 +16,11 @@ static void UART_init(void);
 static void sysclk_init(void);
 static void Error_Handler(void);
 
+extern uint32_t _vector_table_offset;
 
 int main(void)
 {
+  SCB->VTOR = (uint32_t)(&_vector_table_offset);  // set the vector table offset
   sysclk_init();
   UART_init();
 
