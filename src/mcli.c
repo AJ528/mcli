@@ -1,5 +1,6 @@
 
 #include "mcli.h"
+#include "mprintf.h"
 #include "utils.h"
 
 #include <stdint.h>
@@ -8,7 +9,7 @@
 // RX_BUFFER_SIZE must be a power of 2
 // this lets the read/write indices wrap much faster without using modulo
 #define RX_BUFFER_SIZE    128
-
+// CMD_BUFFER_SIZE doesn't need to be a power of 2
 #define CMD_BUFFER_SIZE   128
 
 
@@ -89,7 +90,10 @@ void cli_process(void)
     char c = (char)bufPop(&rxBuffer);
 
     // check for escape sequence
-    if((previous_char[0] == '[') && (previous_char[1] == 0x1B)){
+    if((previous_char[0] == 0x1B) && (c == '[')){
+      // avoid printing '['. This is technically a printable character, 
+      // but in this context it's an escape code
+    }else if((previous_char[0] == '[') && (previous_char[1] == 0x1B)){
       handle_escape_char(c);
     }else if(isPrintableChar(c)){
       handle_printable_char(c);
@@ -114,6 +118,8 @@ static void handle_printable_char(char c)
   // cmdBufRWSize is the largest size usable to hold printable characters
   // 2 bytes at the end are reserved for double '\0'
   static const uint32_t cmdBufRWSize = CMD_BUFFER_SIZE - 2;
+  // this escape sequence will shift all chars past the cursor 1 space to the right
+  static const char esc_seq_insert_char[] = "\x1B[@";
 
   // if cmdBuffer is already holding the limit of printable characters
   if(cmdBuffer.len >= cmdBufRWSize){
@@ -128,7 +134,7 @@ static void handle_printable_char(char c)
   cmdBuffer.data[insert_pos] = c;
 
   if(cmdBuffer.cursorOffset > 0){
-    // writeToOutput(cli, escSeqInsertChar); // Insert Character
+    puts_(esc_seq_insert_char);
   } 
 
   putchar_(c);
@@ -136,6 +142,11 @@ static void handle_printable_char(char c)
 
 static void handle_escape_char(char c)
 {
+  // this escape sequence moves the cursor 1 space to the right
+  static const char esc_seq_cursor_right[] = "\x1B[C";
+  // this escape sequence moves the cursor 1 space to the left
+  static const char esc_seq_cursor_left[] = "\x1B[D";
+
   switch(c){
   case 'A':
     // cursor up
@@ -147,11 +158,17 @@ static void handle_escape_char(char c)
     break;
   case 'C':
     // cursor right
-    // TODO
+    if(cmdBuffer.cursorOffset > 0){
+      cmdBuffer.cursorOffset--;
+      puts_(esc_seq_cursor_right);
+    }
     break;
   case 'D':
     // cursor left
-    // TODO
+    if(cmdBuffer.cursorOffset < cmdBuffer.len){
+      cmdBuffer.cursorOffset++;
+      puts_(esc_seq_cursor_left);
+    }
     break;
   default:
     // encountered unsupported character, do nothing
