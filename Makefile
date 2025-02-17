@@ -28,18 +28,17 @@ TARGET_BIN := $(BIN_DIR)/$(TARGET_NAME).bin
 # these locations should be specified relative to the makefile location.
 SRC_DIRS = \
 	src \
-	drivers \
 	drivers/utilities \
-	drivers/stm32wlxx_low_level
+	drivers/stm32wl_drivers/stm32wlxx_low_level
 
 # locations of directories containing header files.
 # these locations should be specified relative to the makefile location.
 INC_DIRS = \
 	inc \
 	drivers/inc \
-	drivers/CMSIS_inc \
-	drivers/device_inc \
-	drivers/stm32wlxx_ll_inc
+	drivers/stm32wl_drivers/CMSIS_inc \
+	drivers/stm32wl_drivers/device_inc \
+	drivers/stm32wl_drivers/stm32wlxx_ll_inc
 
 # predefined macros
 DEFINES = 		\
