@@ -127,9 +127,7 @@ static void handle_printable_char(char c)
   }
 
   uint32_t insert_pos = cmdBuffer.len - cmdBuffer.cursorOffset;
-
   memmove_(&(cmdBuffer.data[insert_pos+1]), &(cmdBuffer.data[insert_pos]), cmdBuffer.cursorOffset + 1);
-
   cmdBuffer.len++;
   cmdBuffer.data[insert_pos] = c;
 
@@ -178,6 +176,8 @@ static void handle_escape_char(char c)
 
 static void handle_control_char(char c)
 {
+  // this escape sequence moves the cursor 1 space to the left, then deletes that character
+  static const char esc_seq_backspace[] = "\x1B[D\x1B[P";
   switch(c){
   case '\n':
     if(previous_char[0] == '\r'){
@@ -192,7 +192,10 @@ static void handle_control_char(char c)
     // DEL case falls through and is treated the same as the BS case
   case '\b':
     // backspace was pressed, handle it here
-    // TODO
+    puts_(esc_seq_backspace);
+    uint32_t insert_pos = cmdBuffer.len - cmdBuffer.cursorOffset;
+    memmove_(&(cmdBuffer.data[insert_pos-1]), &(cmdBuffer.data[insert_pos]), cmdBuffer.cursorOffset + 1);
+    cmdBuffer.len--;
     break;
   default:
     // encountered unsupported character, do nothing
