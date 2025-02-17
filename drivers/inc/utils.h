@@ -10,4 +10,6 @@
   } \
 } while(0)
 
+void* memmove_(void *destination, const void *source, uint32_t num);
+
 #endif /* __UTILS_H */

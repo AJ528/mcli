@@ -1,5 +1,6 @@
 
 #include "mcli.h"
+#include "utils.h"
 
 #include <stdint.h>
 #include <stdbool.h>
@@ -29,7 +30,8 @@ typedef struct {
   uint32_t size;
   // len is the current length of the text in the buffer
   uint32_t len;
-  // cursorOffset is how far the cursor is from the end of the entered text
+  // cursorOffset is how far the cursor is from the end of the entered text.
+  // 0 means the cursor is all the way to the right
   uint32_t cursorOffset;
 } txtBuf;
 
@@ -120,7 +122,14 @@ static void handle_printable_char(char c)
 
   uint32_t insert_pos = cmdBuffer.len - cmdBuffer.cursorOffset;
 
-  
+  memmove_(&(cmdBuffer.data[insert_pos+1]), &(cmdBuffer.data[insert_pos]), cmdBuffer.cursorOffset + 1);
+
+  cmdBuffer.len++;
+  cmdBuffer.data[insert_pos] = c;
+
+  if(cmdBuffer.cursorOffset > 0){
+    // writeToOutput(cli, escSeqInsertChar); // Insert Character
+  } 
 
   putchar_(c);
 }
@@ -198,7 +207,7 @@ static void parse_command(void)
 
 }
 
-/* Buffer Functions */
+/***** Buffer Functions *****/
 
 static int32_t bufPush(ringBuf *buf, uint8_t value)
 {
