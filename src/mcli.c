@@ -13,7 +13,11 @@
 #define CMD_BUFFER_SIZE   128
 // MAX_NUM_ARGS is the maximum number of arguments allowed to be passed to a command
 #define MAX_NUM_ARGS      7
+// HISTORY_SIZE must be a multiple of 4
+// HISTORY_SIZE determines how many commands can be held in history before the oldest is freed
+#define HISTORY_SIZE      1024
 
+/* Internal Structures */
 
 typedef struct {
   uint8_t *data;
@@ -38,6 +42,16 @@ typedef struct {
   uint32_t cursorOffset;
 } txtBuf;
 
+typedef struct cmd_hist {
+  // cmd_len is the length of string cmd
+  uint32_t cmd_len;
+  // prev points to the previous (newer) command in the linked list
+  struct cmd_hist *prev;
+  // next points to the next (older) command in the linked list
+  struct cmd_hist *next;
+  // cmd is variable length string. This is the first character.
+  char cmd;
+} cmdHistory;
 
 /* Internal Variables and Structures */
 
@@ -53,11 +67,18 @@ static ringBuf rxBuffer = {
 static char previous_char[2] = {0};
 
 static txtBuf cmdBuffer = {
-  .data = (char[CMD_BUFFER_SIZE]){0},
   .size = CMD_BUFFER_SIZE,
   .len = 0,
-  .cursorOffset = 0
+  .cursorOffset = 0,
+  .data = (char[CMD_BUFFER_SIZE]){0},
 };
+
+// newest command stored in history
+static cmdHistory *newest_cmd = NULL;
+// oldest command stored in history
+static cmdHistory *oldest_cmd = NULL;
+// history command currently being shown
+static cmdHistory *history_cmd = NULL;
 
 
 /* Internal Function Definitions */
@@ -68,8 +89,16 @@ static uint8_t bufPop(ringBuf *buf);
 static int32_t bufPush(ringBuf *buf, uint8_t value);
 static bool bufIsEmpty(ringBuf *buf);
 
+static void history_display(cmdHistory *hist_cmd);
+static void history_input(txtBuf *cmd);
+static void * history_malloc(uint32_t byte_request);
+static void free_oldest_cmd(void);
+
 static inline bool isPrintableChar(char c);
+static inline bool isBlank(txtBuf *buf);
 static inline void reset_cmdBuffer(void);
+static inline void print_prompt(void);
+static void clear_cmd_line(bool show_prompt);
 
 static void handle_escape_char(char c);
 static void handle_printable_char(char c);
@@ -154,11 +183,19 @@ static void handle_escape_char(char c)
   switch(c){
   case 'A':
     // cursor up
-    // TODO
+    if(history_cmd == NULL){
+      history_cmd = newest_cmd;
+    }else if(history_cmd->next != NULL){
+      history_cmd = history_cmd->next;
+    }
+    history_display(history_cmd);
     break;
   case 'B':
     // cursor down
-    // TODO
+    if(history_cmd != NULL){
+      history_cmd = history_cmd->prev;
+    }
+    history_display(history_cmd);
     break;
   case 'C':
     // cursor right
@@ -192,10 +229,13 @@ static void handle_control_char(char c)
     }// else fall through
   case '\r':
     // enter was pressed, handle it here!
-    print_newline();
+    history_input(&cmdBuffer);
+    history_cmd = NULL;
     parse_command();
     // reset the command buffer
     reset_cmdBuffer();
+    print_newline();
+    print_prompt();
     break;
   case 0x7F:
     // DEL case falls through and is treated the same as the BS case
@@ -224,11 +264,36 @@ static inline bool isPrintableChar(char c)
   }
 }
 
+static inline bool isBlank(txtBuf *buf)
+{
+  for(uint32_t i = 0; i < buf->len; i++){
+    if(isPrintableChar(buf->data[i])){
+      return false;
+    }
+  }
+  return true;
+}
+
 static inline void reset_cmdBuffer(void)
 {
     cmdBuffer.data[0] = '\0';
     cmdBuffer.len = 0;
     cmdBuffer.cursorOffset = 0;
+}
+
+static void clear_cmd_line(bool show_prompt)
+{
+  // clears the entire line, then resets the cursor to the beginning of the line
+  static const char esc_seq_clear_line[] = "\x1B[2K\r";
+  puts_(esc_seq_clear_line);
+  if(show_prompt){
+    print_prompt();
+  }
+}
+
+static inline void print_prompt(void)
+{
+  puts_("# ");
 }
 
 static void parse_command(void)
@@ -271,6 +336,122 @@ static int32_t tokenize_command(char* cmd_buffer, uint32_t* argc, char* argv[])
     c = cmd_buffer[i];
   }
   return 0;
+}
+
+/***** History Functions *****/
+static void history_display(cmdHistory *hist_cmd)
+{
+  reset_cmdBuffer();
+  clear_cmd_line(true);
+  if(hist_cmd != NULL){
+    memcpy_(cmdBuffer.data, &hist_cmd->cmd, (hist_cmd->cmd_len+1));
+    cmdBuffer.len = hist_cmd->cmd_len;
+    puts_(cmdBuffer.data);
+  }
+}
+static void history_input(txtBuf *cmd)
+{
+  // copy the command into history if it doesn't match the newest history command
+
+  if(newest_cmd != NULL){
+    if(strcmp_(&newest_cmd->cmd, cmd->data) == 0){  // if the command we want to put into history is already newest_cmd, skip
+      return;
+    }
+  }
+
+  if(isBlank(cmd) == true){   // if the cmd is blank, don't store it
+    return;
+  }
+
+
+
+  uint32_t size_req = (sizeof(cmdHistory)-3) + (cmd->len);
+
+  // make sure we request bytes in word increments
+  while(size_req & 0x03){
+    size_req++;
+  }
+
+  cmdHistory *new_node = (cmdHistory *)history_malloc(size_req);
+
+  while(new_node == NULL){
+    if(oldest_cmd == NULL){
+      return;   // no room to store the command
+    }else{
+      // free the oldest entry and retry
+      free_oldest_cmd();
+      new_node = (cmdHistory *)history_malloc(size_req);
+    }
+  }
+
+  new_node->cmd_len = cmd->len;
+  new_node->prev = NULL;
+  new_node->next = newest_cmd;
+  memcpy_(&new_node->cmd, cmd->data, cmd->len);
+  *((char*)&new_node->cmd + cmd->len) = '\0';   // put a null byte on the end of the string
+
+  if(newest_cmd == NULL){   // if there aren't any commands in the history yet
+    oldest_cmd = new_node;  // this entry automatically becomes the oldest
+  }else{
+    newest_cmd->prev = new_node;  // otherwise, newest_command now has a younger brother
+  }
+
+  newest_cmd = new_node;    // regardless, new_node is now the new newest_command
+}
+
+static void * history_malloc(uint32_t byte_request)
+{
+  // allocate memory to store a new history command
+  static uint8_t __attribute__((aligned(4))) memory[HISTORY_SIZE];
+  static void *const memory_start = (void *)memory;
+  static void *const memory_end = (void *)memory + HISTORY_SIZE;
+
+  void *memory_block_start;
+  void *memory_block_end;
+  static void *next_block;
+
+  // if nothing has been allocated yet, start at the beginning
+  if(newest_cmd == NULL){
+    memory_block_start = memory_start;
+    memory_block_end = memory_block_start + byte_request;
+    if(memory_block_end <= memory_end){   // check if we are requesting more bytes than HISTORY_SIZE
+      next_block = memory_block_end;
+      return memory_block_start;
+    }else{
+      return NULL;
+    }
+  }else{    // memory has already been allocated
+    memory_block_start = next_block;
+    memory_block_end = memory_block_start + byte_request;
+    if(newest_cmd >= oldest_cmd){
+      if(memory_block_end <= memory_end){   // if there is space after the newest_cmd and before memory_end
+        next_block = memory_block_end;
+        return memory_block_start;
+      }else if(memory_start + byte_request <= (void*)oldest_cmd){   //otherwise, check for space after memory_start and before oldest_cmd
+        next_block = memory_start + byte_request;
+        return memory_start;
+      }else{
+        return NULL;        // otherwise, not enough memory
+      }
+    }else{
+      if(memory_block_end <= (void*)oldest_cmd){
+        next_block = memory_block_end;
+        return memory_block_start;
+      }else{
+        return NULL;
+      }
+    }
+  }
+
+  return NULL;
+}
+
+static void free_oldest_cmd(void)
+{
+  if(oldest_cmd != NULL){
+    oldest_cmd = oldest_cmd->prev;
+    oldest_cmd->next = NULL;
+  }
 }
 
 /***** Buffer Functions *****/
