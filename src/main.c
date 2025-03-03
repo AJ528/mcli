@@ -24,9 +24,6 @@ int main(void)
   sysclk_init();
   UART_init();
 
-
-  println_("hello world!");
-
   while (1)
   {
     // if UART data is present, receive it

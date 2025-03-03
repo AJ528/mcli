@@ -38,7 +38,7 @@ memmove_:
   blo   quad_b_copy         @ if not, copy 4 bytes at a time
   tst   r5, r6              @ check if dest-source is a multiple of 4
   bne   quad_b_copy         @ if not, copy 4 bytes at a time
-  tst   r1, r6              @ check if the source address is 4-byte aligned
+  tst   r3, r6              @ check if the final source address + 1 is 4-byte aligned
   bne   quad_b_copy         @ if not, copy 4 bytes at a time
 
 

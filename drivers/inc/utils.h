@@ -3,6 +3,8 @@
 
 #include <stdint.h>
 
+#define NULL    ((void *) 0)
+
 #define CHECK(x) do { \
   int32_t retval = (x); \
   if(retval < 0){ \
@@ -10,6 +12,8 @@
   } \
 } while(0)
 
+int32_t strcmp_(const char *str1, const char *str2);
 void* memmove_(void *destination, const void *source, uint32_t num);
+void* memcpy_(void *destination, const void *source, uint32_t num);
 
 #endif /* __UTILS_H */
