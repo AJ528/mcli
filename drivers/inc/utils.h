@@ -6,9 +6,9 @@
 #define NULL    ((void *) 0)
 
 #define CHECK(x) do { \
-  int32_t retval = (x); \
-  if(retval < 0){ \
-    return(retval); \
+  int32_t v = (x); \
+  if(v < 0){ \
+    return(v); \
   } \
 } while(0)
 

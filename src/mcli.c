@@ -17,6 +17,8 @@
 // HISTORY_SIZE determines how many commands can be held in history before the oldest is freed
 #define HISTORY_SIZE      1024
 
+#define NUM_COMMANDS      (sizeof(cmd_table)/sizeof(cmd_table[0]))
+
 /* Internal Structures */
 
 typedef struct {
@@ -53,33 +55,11 @@ typedef struct cmd_hist {
   char cmd;
 } cmdHistory;
 
-/* Internal Variables and Structures */
-
-// ring buffer to hold received characters until they are processed
-static ringBuf rxBuffer = {
-  .data = (uint8_t[RX_BUFFER_SIZE]){},
-  .size = RX_BUFFER_SIZE,
-  .writeIndex = 0,
-  .readIndex = 0,
-  .overflow = false
-};
-
-static char previous_char[2] = {0};
-
-static txtBuf cmdBuffer = {
-  .size = CMD_BUFFER_SIZE,
-  .len = 0,
-  .cursorOffset = 0,
-  .data = (char[CMD_BUFFER_SIZE]){0},
-};
-
-// newest command stored in history
-static cmdHistory *newest_cmd = NULL;
-// oldest command stored in history
-static cmdHistory *oldest_cmd = NULL;
-// history command currently being shown
-static cmdHistory *history_cmd = NULL;
-
+typedef struct {
+  const char *const cmd_name;
+  int32_t (*func_pointer)(uint32_t argc, char* argv[]);
+  const char *const help_text;
+} cmdEntry;
 
 /* Internal Function Definitions */
 
@@ -104,11 +84,51 @@ static void handle_escape_char(char c);
 static void handle_printable_char(char c);
 static void handle_control_char(char c);
 
-static void parse_command(void);
+static int32_t parse_command(void);
 static int32_t tokenize_command(char* cmd_buffer, uint32_t* argc, char* argv[]);
 
+/* External Functions Listed in cmd_table */
+extern int32_t help_cmd(uint32_t argc, char* argv[]);
+
+/* Internal Variables and Structures */
+static const cmdEntry cmd_table[] =
+{
+  {
+    .cmd_name = "help",
+    .func_pointer = help_cmd,
+    .help_text = "displays list of builtin commands"
+  }
+};
 
 
+// ring buffer to hold received characters until they are processed
+static ringBuf rxBuffer = {
+  .data = (uint8_t[RX_BUFFER_SIZE]){},
+  .size = RX_BUFFER_SIZE,
+  .writeIndex = 0,
+  .readIndex = 0,
+  .overflow = false
+};
+
+static txtBuf cmdBuffer = {
+  .size = CMD_BUFFER_SIZE,
+  .len = 0,
+  .cursorOffset = 0,
+  .data = (char[CMD_BUFFER_SIZE]){0},
+};
+
+// the 2 previously entered characters
+static char previous_char[2] = {0};
+
+// newest command stored in history
+static cmdHistory *newest_cmd = NULL;
+// oldest command stored in history
+static cmdHistory *oldest_cmd = NULL;
+// history command currently being shown
+static cmdHistory *history_cmd = NULL;
+
+
+/* Function Definitions */
 void cli_input(char c)
 {
   int32_t result = bufPush(&rxBuffer, (uint8_t)c);
@@ -229,19 +249,24 @@ static void handle_control_char(char c)
     }// else fall through
   case '\r':
     // enter was pressed, handle it here!
-    history_input(&cmdBuffer);
-    history_cmd = NULL;
-    parse_command();
+    print_newline();
+    // if the line wasn't blank, store it and process it
+    if(!isBlank(&cmdBuffer)){
+      history_input(&cmdBuffer);
+      history_cmd = NULL;
+      parse_command();
+    }
     // reset the command buffer
     reset_cmdBuffer();
-    print_newline();
     print_prompt();
     break;
   case 0x7F:
     // DEL case falls through and is treated the same as the BS case
   case '\b':
     // backspace was pressed, handle it here
+    // delete the character from the screen
     puts_(esc_seq_backspace);
+    // remove the character from the command buffer
     uint32_t insert_pos = cmdBuffer.len - cmdBuffer.cursorOffset;
     memmove_(&(cmdBuffer.data[insert_pos-1]), &(cmdBuffer.data[insert_pos]), cmdBuffer.cursorOffset + 1);
     cmdBuffer.len--;
@@ -296,19 +321,26 @@ static inline void print_prompt(void)
   puts_("# ");
 }
 
-static void parse_command(void)
+static int32_t parse_command(void)
 {
   uint32_t argc;
-  char* argv[MAX_NUM_ARGS + 1];
+  char* argv[MAX_NUM_ARGS];
 
   int32_t retval = tokenize_command(cmdBuffer.data, &argc, argv);
-
-  if(retval < 0){
-    return;
-  }
+  CHECK(retval);
 
   // look for a matching command name
   // and call it
+  for(uint32_t i = 0; i < NUM_COMMANDS; i++){
+    if(strcmp_(argv[0], cmd_table[i].cmd_name) == 0){
+      retval = (cmd_table[i].func_pointer)(argc, argv);
+      CHECK(retval);
+      return(0);
+    }
+  }
+
+  println_("ERROR: command not found!");
+  return (-1);
 }
 
 static int32_t tokenize_command(char* cmd_buffer, uint32_t* argc, char* argv[])
@@ -358,12 +390,6 @@ static void history_input(txtBuf *cmd)
       return;
     }
   }
-
-  if(isBlank(cmd) == true){   // if the cmd is blank, don't store it
-    return;
-  }
-
-
 
   uint32_t size_req = (sizeof(cmdHistory)-3) + (cmd->len);
 
