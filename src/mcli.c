@@ -6,9 +6,14 @@
 #include <stdint.h>
 #include <stdbool.h>
 
+// RX_BUFFER_SIZE is the size (in bytes) of the input ring buffer.
+// This is where all characters are temporarily stored until they can be processed.
 // RX_BUFFER_SIZE must be a power of 2
 // this lets the read/write indices wrap much faster without using modulo
 #define RX_BUFFER_SIZE    128
+// CMD_BUFFER_SIZE is the size (in bytes) of the command buffer.
+// This is where the command line currently being typed is stored.
+// It also sets the maximum line length.
 // CMD_BUFFER_SIZE doesn't need to be a power of 2
 #define CMD_BUFFER_SIZE   128
 // MAX_NUM_ARGS is the maximum number of arguments allowed to be passed to a command
