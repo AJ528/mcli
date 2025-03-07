@@ -93,7 +93,7 @@ static bool bufIsEmpty(ringBuf *buf);
 extern int32_t putchar_(char c);
 
 /*** Command Table Functions ***/
-extern int32_t help_cmd(uint32_t argc, char* argv[]);
+static int32_t help_cmd(uint32_t argc, char* argv[]);
 
 /*** Internal Variables and Structures ***/
 // cmd_table is where command names (what is typed) get mapped
@@ -181,7 +181,11 @@ void cli_process(void)
   }
 }
 
-
+static int32_t help_cmd(uint32_t argc, char* argv[])
+{
+  println_("this is help command!");
+  return (0);
+}
 
 static void handle_printable_char(char c)
 {
@@ -319,9 +323,9 @@ static inline bool isBlank(txtBuf *buf)
 {
   // look at all characters in the buffer
   for(uint32_t i = 0; i < buf->len; i++){
-    // as soon as we encounter one that is printable,
-    // we know the buffer isn't blank
-    if(isPrintableChar(buf->data[i])){
+    // as soon as we encounter a character that is printable
+    // (and not space!), we know the buffer isn't blank
+    if((isPrintableChar(buf->data[i])) && (buf->data[i] != ' ')){
       return false;
     }
   }

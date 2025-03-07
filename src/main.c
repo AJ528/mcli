@@ -37,13 +37,6 @@ int main(void)
   }
 }
 
-int32_t help_cmd(uint32_t argc, char* argv[])
-{
-  println_("this is help command!");
-  return (0);
-}
-
-
 int32_t putchar_(char c)
 {
   // loop while the LPUART_TDR register is full
