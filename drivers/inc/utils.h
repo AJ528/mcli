@@ -12,6 +12,8 @@
   } \
 } while(0)
 
+#define COUNT_OF(arr) (sizeof(arr)/sizeof(arr[0]))
+
 int32_t strcmp_(const char *str1, const char *str2);
 void* memmove_(void *destination, const void *source, uint32_t num);
 void* memcpy_(void *destination, const void *source, uint32_t num);
