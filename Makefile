@@ -42,6 +42,7 @@ INC_DIRS = \
 
 # predefined macros
 DEFINES = 		\
+	VERSION=$(GIT_VERSION) \
 	STM32WL 	\
 	STM32WL55xx	\
 	CORE_CM4
@@ -69,19 +70,21 @@ else
 	FLOAT_FLAGS = -mfloat-abi=soft
 endif
 
-# creates the list of define flags to pass to the compiler
-DEFINE_FLAGS := $(addprefix -D,$(DEFINES))
-# creates the list of include flags to pass to the compiler
-INC_FLAGS := $(addprefix -I,$(INC_DIRS))
-# adds the source directories to Make's search path
-VPATH = $(SRC_DIRS)
-
 # compiler you want to use
 CC = arm-none-eabi-gcc
 # objcopy you want to use
 OBJCOPY =  arm-none-eabi-objcopy
 # size you want to use
 SIZE = arm-none-eabi-size
+# command to retrieve software version
+GIT_VERSION = "\"$(shell git describe --tags --long --abbrev=8 --dirty --always)\""
+
+# creates the list of define flags to pass to the compiler
+DEFINE_FLAGS := $(addprefix -D,$(DEFINES))
+# creates the list of include flags to pass to the compiler
+INC_FLAGS := $(addprefix -I,$(INC_DIRS))
+# adds the source directories to Make's search path
+VPATH = $(SRC_DIRS)
 
 # cpu target and instruction set
 COMMON_FLAGS = -mcpu=cortex-m4

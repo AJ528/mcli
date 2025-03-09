@@ -22,6 +22,7 @@
 // HISTORY_SIZE determines how many commands can be held in history before the oldest is freed
 #define HISTORY_SIZE      1024
 
+
 /*** Internal Structures ***/
 typedef struct {
   // data points to the block of memory where data is stored
@@ -183,7 +184,24 @@ void cli_process(void)
 
 static int32_t help_cmd(uint32_t argc, char* argv[])
 {
-  println_("this is help command!");
+  const int32_t cmd_col_width = -20;    // negative number means text will be left-aligned
+  puts_("Remote Base Station ");
+  // VERSION is defined in the makefile and passed to the compiler
+  println_(VERSION);
+
+  println_("This device receives commands wirelessly from a remote and sends out infrared");
+  println_("signals to complete these commands. This command line interface is used for ");
+  println_("debugging and software updates.");
+  println_("The following commands are defined internally. Enter a command without any");
+  println_("arguments to see usage instructions.");
+  print_newline();
+
+  printfln_("%*s%s", cmd_col_width, "Command:", "Description:");
+
+  for(uint32_t i = 0; i < COUNT_OF(cmd_table); i++){
+    printfln_("%*s%s", cmd_col_width, cmd_table[i].cmd_name, cmd_table[i].help_text);
+  }
+
   return (0);
 }
 
