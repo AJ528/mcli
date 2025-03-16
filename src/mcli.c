@@ -93,8 +93,11 @@ static bool bufIsEmpty(ringBuf *buf);
 // this function is called to output a single character over UART
 extern int32_t putchar_(char c);
 
-/*** Command Table Functions ***/
+/*** Command Table Function Declarations ***/
 static int32_t help_cmd(uint32_t argc, char* argv[]);
+// declare more command functions here. Functions must have the form:
+// int32_t func_name(uint32_t argc, char*argv[]);
+
 
 /*** Internal Variables and Structures ***/
 // cmd_table is where command names (what is typed) get mapped
@@ -106,6 +109,7 @@ static const cmdEntry cmd_table[] =
     .func_pointer = help_cmd,
     .help_text = "displays list of builtin commands"
   }
+  // after declaring a new command function above, add an entry for it in this table
 };
 
 // ring buffer to hold received characters until they are processed
@@ -121,10 +125,10 @@ static ringBuf rxBuffer = {
 // as characters are typed or deleted, this buffer gets modified to match
 // the displayed characters
 static txtBuf cmdBuffer = {
+  .data = (char[CMD_BUFFER_SIZE]){0},
   .size = CMD_BUFFER_SIZE,
   .len = 0,
-  .cursorOffset = 0,
-  .data = (char[CMD_BUFFER_SIZE]){0},
+  .cursorOffset = 0
 };
 
 // the 2 previously entered characters
