@@ -189,13 +189,10 @@ void cli_process(void)
 static int32_t help_cmd(uint32_t argc, char* argv[])
 {
   const int32_t cmd_col_width = -20;    // negative number means text will be left-aligned
-  puts_("Remote Base Station ");
+  puts_("Command Line Interface ");
   // VERSION is defined in the makefile and passed to the compiler
   println_(VERSION);
 
-  println_("This device receives commands wirelessly from a remote and sends out infrared");
-  println_("signals to complete these commands. This command line interface is used for ");
-  println_("debugging and software updates.");
   println_("The following commands are defined internally. Enter a command without any");
   println_("arguments to see usage instructions.");
   print_newline();
