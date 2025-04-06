@@ -10,7 +10,7 @@ Does everything I need it to. Will fix bugs as I come across them.
 3. In your program: 
   - Call `cli_input()` whenever your text interface receives a character. Pass that character to `cli_input()`.
   - Create a function `int32_t putchar_(char c)` that outputs character `c` to the text interface every time it is called.
-  - Call `cli_process()` somewhere in your superloop so it is called regularly. This function processes incoming/outgoing text.
+  - Put `cli_process()` somewhere in your superloop so it is called regularly. This function processes incoming/outgoing text.
 4. Done! 
 
 ### How to measure the size of this project
